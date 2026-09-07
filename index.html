@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetGits Meet Ultimate</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --sidebar-bg: #0b0f19;
+            --accent: #2563eb;
+            --danger: #ef4444;
+            --success: #10b981;
+            --text: #f8fafc;
+            --subtext: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: var(--card-bg);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+            height: 60px;
+        }
+
+        .brand { font-size: 1.3rem; font-weight: bold; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+        .room-badge { background: #334155; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; color: #e2e8f0; }
+
+        .app-body {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 130px);
+            position: relative;
+        }
+
+        .stage {
+            flex: 1;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            width: 100%;
+            height: 100%;
+            max-width: 1400px;
+        }
+
+        .video-box {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .mirror { transform: scaleX(-1); }
+
+        .video-overlay {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(15, 23, 42, 0.75);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid #334155;
+            display: none;
+            flex-direction: column;
+        }
+        .sidebar.active { display: flex; }
+
+        .sidebar-header {
+            padding: 15px;
+            border-bottom: 1px solid #334155;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { background: #1e293b; padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; max-width: 85%; }
+        .msg.me { background: var(--accent); align-self: flex-end; }
+
+        .chat-input-box { padding: 12px; border-top: 1px solid #334155; display: flex; gap: 8px; }
+        .chat-input-box input { flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px; }
+
+        footer {
+            background: var(--card-bg);
+            height: 70px;
+            border-top: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 0 20px;
+        }
+
+        .btn-ctrl {
+            background: #334155;
+            color: #fff;
+            border: none;
+            min-width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            padding: 0 10px;
+            gap: 5px;
+        }
+
+        .btn-ctrl:hover { background: #475569; }
+        .btn-ctrl.off { background: var(--danger); }
+        .btn-end { background: var(--danger); font-weight: bold; padding: 0 20px; }
+
+        .setup-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .setup-card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid #334155;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background: #0b0f19;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #fff;
+            margin: 10px 0 15px 0;
+            direction: ltr;
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .panel { display: none; }
+        .panel.active { display: block; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand"><span>🚀</span> NetGits Meet Ultimate</div>
+        <div class="room-badge" id="roomStatus">خارج الغرفة</div>
+    </header>
+
+    <div class="app-body">
+        <div class="stage">
+            <div class="video-grid" id="videoGrid">
+                <div class="video-box" id="localVideoContainer">
+                    <video id="localVideo" class="mirror" autoplay playsinline muted></video>
+                    <div class="video-overlay"><span id="localMicState">🎙️</span> أنت</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar" id="sidebarPanel">
+            <div class="sidebar-header">
+                <span>المحادثة النصية</span>
+                <button style="background:none; border:none; color:#fff; cursor:pointer;" onclick="toggleSidebar()">✕</button>
+            </div>
+            <div class="chat-messages" id="chatBox"></div>
+            <div class="chat-input-box">
+                <input type="text" id="chatInput" placeholder="اكتب رسالة..." onkeypress="handleChatKey(event)">
+                <button class="btn-ctrl" onclick="sendChatMessage()">إرسال</button>
+            </div>
+        </div>
+    </div>
+
+    <footer id="footerControls" style="display:none;">
+        <button class="btn-ctrl" id="micBtn" onclick="toggleMic()">🎙️</button>
+        <button class="btn-ctrl" id="camBtn" onclick="toggleCam()">📹</button>
+        <button class="btn-ctrl" id="screenBtn" onclick="toggleScreenShare()">💻</button>
+        <button class="btn-ctrl" onclick="toggleSidebar()">💬</button>
+        <button class="btn-ctrl btn-end" onclick="logout()">مغادرة 🚪</button>
+    </footer>
+
+    <div class="setup-overlay" id="setupOverlay">
+        <div class="setup-card">
+            <!-- Panel 1: Host Room Creation -->
+            <div id="rolePanel" class="panel active">
+                <h2 style="margin-bottom: 15px;">انضمام للغرفة</h2>
+                <input type="text" id="roomNameInput" placeholder="اسم الغرفة (مثال: Dev-Team)">
+                <button class="btn-action" onclick="createRoomHost()">إنشاء غرفة جديدة (Host)</button>
+            </div>
+
+            <!-- Panel 2: Guest Auto Detection -->
+            <div id="guestAutoPanel" class="panel">
+                <h3>الدخول للغرفة تلقائياً 🚀</h3>
+                <p style="color:var(--subtext); margin: 15px 0;" id="guestDetectedRoom">تم التعرف على الغرفة تلقائياً...</p>
+                <button class="btn-action" onclick="joinRoomGuest()">دخول الغرفة الآن</button>
+            </div>
+
+            <!-- Panel 3: Host Waiting Link -->
+            <div id="hostPanel" class="panel">
+                <h3>رابط الدعوة المباشر</h3>
+                <p style="color:var(--subtext); font-size:0.85rem;" id="hostStatus">جاري تجهيز الكاميرا والرابط...</p>
+                <div id="hostLinkBox" style="display:none;">
+                    <p style="color:var(--subtext); font-size:0.85rem; margin-top:10px;">انسخ هذا الرابط وأرسله للمشاركين:</p>
+                    <input type="text" id="hostGeneratedLink" readonly onclick="this.select()">
+                    <button class="btn-action" style="background:var(--success);" onclick="enterRoomUI()">دخول الغرفة</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        let localStream, peerConnection, dataChannel;
+        let isMicOn = true, isCamOn = true;
+        let currentRoom = "";
+
+        // Auto Detection for Guests on Load
+        window.onload = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            
+            if (roomParam) {
+                currentRoom = roomParam;
+                showPanel('guestAutoPanel');
+                document.getElementById('guestDetectedRoom').innerText = `تم التعرف على الغرفة: (${roomParam})`;
+            }
+        };
+
+        function showPanel(panelId) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+        }
+
+        async function initLocalMedia() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+            } catch (e) {
+                alert("يرجى إعطاء صلاحية الكاميرا والمايكروفون!");
+            }
+        }
+
+        // Host Flow
+        async function createRoomHost() {
+            const roomName = document.getElementById('roomNameInput').value;
+            if (!roomName) return alert("يرجى إدخال اسم الغرفة!");
+
+            currentRoom = roomName;
+            showPanel('hostPanel');
+            await initLocalMedia();
+
+            peerConnection = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            dataChannel = peerConnection.createDataChannel("chat");
+            setupDataChannel();
+
+            peerConnection.onicecandidate = e => {
+                if (!e.candidate) {
+                    const offerSdp = btoa(JSON.stringify(peerConnection.localDescription));
+                    const fullLink = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(currentRoom)}#offer=${offerSdp}`;
+                    document.getElementById('hostGeneratedLink').value = fullLink;
+                    document.getElementById('hostStatus').style.display = 'none';
+                    document.getElementById('hostLinkBox').style.display = 'block';
+                }
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+        }
+
+        // Guest Flow
+        async function joinRoomGuest() {
+            await initLocalMedia();
+            
+            peerConnection = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ondatachannel = e => {
+                dataChannel = e.channel;
+                setupDataChannel();
+            };
+
+            peerConnection.ontrack = e => {
+                addRemoteStream(e.streams[0]);
+            };
+
+            const hash = window.location.hash;
+            if (hash.includes('#offer=')) {
+                const offerSdp = JSON.parse(atob(hash.replace('#offer=', '')));
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offerSdp));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+            }
+
+            enterRoomUI();
+        }
+
+        function enterRoomUI() {
+            document.getElementById('setupOverlay').style.display = 'none';
+            document.getElementById('footerControls').style.display = 'flex';
+            document.getElementById('roomStatus').innerText = `الغرفة: ${currentRoom}`;
+        }
+
+        function addRemoteStream(stream) {
+            let remoteVideo = document.getElementById('remoteVideo');
+            if (!remoteVideo) {
+                const container = document.createElement('div');
+                container.className = 'video-box';
+                remoteVideo = document.createElement('video');
+                remoteVideo.id = 'remoteVideo';
+                remoteVideo.autoplay = true;
+                remoteVideo.playsinline = true;
+                container.appendChild(remoteVideo);
+                document.getElementById('videoGrid').appendChild(container);
+            }
+            remoteVideo.srcObject = stream;
+        }
+
+        function setupDataChannel() {
+            dataChannel.onmessage = e => {
+                const msg = document.createElement('div');
+                msg.className = 'msg';
+                msg.innerText = e.data;
+                document.getElementById('chatBox').appendChild(msg);
+            };
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            if (!input.value) return;
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(input.value);
+            }
+            const msg = document.createElement('div');
+            msg.className = 'msg me';
+            msg.innerText = input.value;
+            document.getElementById('chatBox').appendChild(msg);
+            input.value = '';
+        }
+
+        function handleChatKey(e) { if (e.key === 'Enter') sendChatMessage(); }
+        function toggleSidebar() { document.getElementById('sidebarPanel').classList.toggle('active'); }
+
+        function toggleMic() {
+            isMicOn = !isMicOn;
+            localStream.getAudioTracks()[0].enabled = isMicOn;
+            document.getElementById('micBtn').classList.toggle('off', !isMicOn);
+        }
+
+        function toggleCam() {
+            isCamOn = !isCamOn;
+            localStream.getVideoTracks()[0].enabled = isCamOn;
+            document.getElementById('camBtn').classList.toggle('off', !isCamOn);
+        }
+
+        function logout() { location.href = window.location.pathname; }
+    </script>
+</body>
+</html>

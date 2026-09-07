@@ -3,19 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetGits Meet Ultimate</title>
-    <!-- PeerJS CDN -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>NetGits Direct P2P Engine</title>
     <style>
         :root {
-            --bg: #0f172a;
+            --bg: #0b0f19;
             --card-bg: #1e293b;
-            --sidebar-bg: #0b0f19;
             --accent: #2563eb;
             --danger: #ef4444;
             --success: #10b981;
             --text: #f8fafc;
-            --subtext: #94a3b8;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,11 +33,9 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #334155;
-            height: 60px;
         }
 
-        .brand { font-size: 1.2rem; font-weight: bold; color: var(--accent); display: flex; align-items: center; gap: 8px; }
-        .room-badge { background: #334155; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; color: #e2e8f0; }
+        .brand { font-weight: bold; color: var(--accent); }
 
         .app-body {
             display: flex;
@@ -54,10 +48,8 @@
             flex: 1;
             padding: 15px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            position: relative;
         }
 
         .video-grid {
@@ -66,7 +58,6 @@
             gap: 15px;
             width: 100%;
             height: 100%;
-            max-width: 1400px;
         }
 
         .video-box {
@@ -78,7 +69,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 200px;
         }
 
         video { width: 100%; height: 100%; object-fit: cover; }
@@ -86,30 +76,19 @@
 
         .video-overlay {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(15, 23, 42, 0.75);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.8rem;
+            bottom: 10px; right: 10px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;
         }
 
         .sidebar {
             width: 320px;
-            background: var(--sidebar-bg);
+            background: #0f172a;
             border-right: 1px solid #334155;
             display: none;
             flex-direction: column;
         }
         .sidebar.active { display: flex; }
-
-        .sidebar-header {
-            padding: 15px;
-            border-bottom: 1px solid #334155;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-        }
 
         .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         .msg { background: #1e293b; padding: 8px 12px; border-radius: 8px; font-size: 0.88rem; max-width: 85%; }
@@ -126,246 +105,267 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
-            padding: 0 15px;
         }
 
         .btn-ctrl {
-            background: #334155;
-            color: #fff;
-            border: none;
-            min-width: 45px;
-            height: 45px;
-            border-radius: 10px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
+            background: #334155; color: #fff; border: none;
+            width: 45px; height: 45px; border-radius: 10px;
+            cursor: pointer; font-size: 1.1rem;
         }
 
-        .btn-ctrl.off { background: var(--danger); }
-        .btn-end { background: var(--danger); font-weight: bold; padding: 0 15px; }
+        .btn-end { background: var(--danger); width: auto; padding: 0 15px; font-weight: bold; }
 
         .setup-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.95);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 999;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 15, 25, 0.95);
+            display: flex; align-items: center; justify-content: center; z-index: 999;
         }
 
         .setup-card {
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 16px;
-            width: 100%; max-width: 450px;
-            border: 1px solid #334155;
-            text-align: center;
+            background: var(--card-bg); padding: 30px; border-radius: 16px;
+            width: 100%; max-width: 480px; border: 1px solid #334155; text-align: center;
         }
 
         input[type="text"] {
-            width: 100%; padding: 12px;
-            background: #0b0f19;
-            border: 1px solid #334155;
-            border-radius: 8px; color: #fff;
-            margin: 10px 0 15px 0;
-            direction: ltr;
+            width: 100%; padding: 12px; background: #0b0f19; border: 1px solid #334155;
+            color: #fff; border-radius: 8px; margin: 10px 0; font-size: 0.85rem; direction: ltr;
         }
 
         .btn-action {
-            width: 100%; padding: 12px;
-            background: var(--accent);
-            color: #fff; border: none;
-            border-radius: 8px; font-weight: bold;
-            cursor: pointer; margin-bottom: 10px;
+            width: 100%; padding: 12px; background: var(--accent); color: #fff;
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="brand"><span>🚀</span> NetGits Meet Ultimate</div>
-        <div class="room-badge" id="roomStatus">خارج الغرفة</div>
+        <div class="brand">⚡ NetGits Instant Link P2P</div>
+        <div id="status">جاهز للإنشاء</div>
     </header>
 
     <div class="app-body">
         <div class="stage">
             <div class="video-grid" id="videoGrid">
-                <div class="video-box" id="box-local">
+                <div class="video-box">
                     <video id="localVideo" class="mirror" autoplay playsinline muted></video>
-                    <div class="video-overlay" id="localTag">أنت</div>
+                    <div class="video-overlay">جهازك المحلي (24fps)</div>
                 </div>
             </div>
         </div>
 
         <div class="sidebar" id="sidebarPanel">
-            <div class="sidebar-header">
-                <span>المحادثة النصية</span>
-                <button style="background:none; border:none; color:#fff; cursor:pointer;" onclick="toggleSidebar()">✕</button>
-            </div>
+            <div style="padding:15px; border-bottom: 1px solid #334155;">المحادثة المباشرة</div>
             <div class="chat-messages" id="chatBox"></div>
             <div class="chat-input-box">
-                <input type="text" id="chatInput" placeholder="اكتب رسالة..." onkeypress="handleChatKey(event)">
+                <input type="text" id="chatInput" placeholder="اكتب رسالة...">
                 <button class="btn-ctrl" onclick="sendChatMessage()">إرسال</button>
             </div>
         </div>
     </div>
 
-    <footer id="footerControls" style="display:none;">
-        <button class="btn-ctrl" id="micBtn" onclick="toggleMic()">🎙️</button>
-        <button class="btn-ctrl" id="camBtn" onclick="toggleCam()">📹</button>
-        <button class="btn-ctrl" id="screenBtn" onclick="toggleScreenShare()">💻</button>
+    <footer>
+        <button class="btn-ctrl" onclick="toggleMic()">🎙️</button>
+        <button class="btn-ctrl" onclick="toggleCam()">📹</button>
+        <button class="btn-ctrl" onclick="toggleScreenShare()">💻</button>
         <button class="btn-ctrl" onclick="toggleSidebar()">💬</button>
-        <button class="btn-ctrl btn-end" onclick="logout()">مغادرة 🚪</button>
+        <button class="btn-ctrl btn-end" onclick="location.href=location.pathname">مغادرة 🚪</button>
     </footer>
 
+    <!-- Overlay Controls -->
     <div class="setup-overlay" id="setupOverlay">
-        <div class="setup-card">
-            <h2>انضمام لغرفة GitHub Pages</h2>
-            <input type="text" id="userNameInput" placeholder="اسمك (مثال: أحمد)">
-            <input type="text" id="roomNameInput" placeholder="اسم الغرفة (مثال: my-room)">
+        <div class="setup-card" id="cardStep1">
+            <h2>محرك رابط الاتصال المباشر</h2>
+            <p style="color:#94a3b8; font-size: 0.85rem; margin: 10px 0;">اضغط إنشاء لبدء الغرفة وتوليد رابط الدعوة المباشر</p>
+            <button class="btn-action" onclick="startHost()">🚀 إنشاء غرفة جديدة وتوليد الرابط</button>
+        </div>
+
+        <div class="setup-card" id="cardStep2" style="display:none;">
+            <h2 style="color:#10b981;">تم توليد الرابط بنجاح!</h2>
+            <p style="color:#94a3b8; font-size: 0.85rem; margin: 8px 0;">انسخ هذا الرابط وأرسله للطرف الآخر مباشرة:</p>
+            <input type="text" id="shareUrlInput" readonly>
+            <button class="btn-action" style="background:#10b981;" onclick="copyShareLink()">📋 نسخ الرابط</button>
             
-            <button class="btn-action" onclick="initRoom(true)">إنشاء كـ (Host)</button>
-            <button class="btn-action" style="background:#10b981;" onclick="initRoom(false)">انضمام كـ (Guest)</button>
+            <hr style="border-color:#334155; margin: 15px 0;">
+            <p style="color:#94a3b8; font-size: 0.85rem;">عندما يفتح الطرف الآخر الرابط، سيعطيك "رابط الرد"، ضعه هنا للاتصال:</p>
+            <input type="text" id="hostAnswerInput" placeholder="ضع رابط الرد هنا...">
+            <button class="btn-action" onclick="acceptGuestAnswer()">⚡ اتصل الآن</button>
+        </div>
+
+        <div class="setup-card" id="cardGuestStep" style="display:none;">
+            <h2>جاري الانضمام للغرفة...</h2>
+            <p style="color:#94a3b8; font-size: 0.85rem; margin: 8px 0;">اضغط الزر لتجهيز رابط الرد وإرساله للمضيف:</p>
+            <button class="btn-action" style="background:#8b5cf6;" onclick="startGuest()">إنشاء رابط الرد 🔗</button>
+            
+            <div id="guestReplyBox" style="display:none;">
+                <p style="color:#10b981; font-size: 0.8rem; margin-top:10px;">انسخ هذا الرابط وأرسله للمضيف لإتمام الاتصال:</p>
+                <input type="text" id="guestReplyUrl" readonly>
+                <button class="btn-action" style="background:#10b981;" onclick="copyGuestReplyLink()">📋 نسخ رابط الرد</button>
+            </div>
         </div>
     </div>
 
     <script>
-        let peer = null;
-        let localStream = null;
-        let dataConn = null;
-        let isMicOn = true, isCamOn = true;
-        let userName = "";
+        const rtcConfig = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" }
+            ]
+        };
 
-        async function initRoom(isHost) {
-            const roomName = document.getElementById('roomNameInput').value.trim().toLowerCase();
-            userName = document.getElementById('userNameInput').value.trim() || "مشارك";
+        let pc = new RTCPeerConnection(rtcConfig);
+        let localStream, dataChannel;
 
-            if (!roomName) return alert("ادخل اسم الغرفة أولاً!");
-
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('localVideo').srcObject = localStream;
-            } catch (e) {
-                return alert("يرجى إعطاء صلاحية الكاميرا والمايكروفون!");
-            }
-
-            document.getElementById('setupOverlay').style.display = 'none';
-            document.getElementById('footerControls').style.display = 'flex';
-            document.getElementById('localTag').innerText = `${userName} (أنت)`;
-            document.getElementById('roomStatus').innerText = `الغرفة: ${roomName}`;
-
-            // Host gets exact roomName as ID, Guest gets random ID
-            const peerId = isHost ? `netgits-${roomName}` : `netgits-${roomName}-user-${Math.floor(Math.random()*1000)}`;
-            
-            peer = new Peer(peerId, {
-                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+        // ضغط دقة ومعالجة الفيديو
+        async function initHardwareMedia() {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { max: 640 }, height: { max: 480 }, frameRate: { max: 24 } },
+                audio: { echoCancellation: true, noiseSuppression: true }
             });
-
-            peer.on('open', (id) => {
-                console.log("My Peer ID:", id);
-                if (!isHost) {
-                    // Connect to Host Video + Chat
-                    const hostId = `netgits-${roomName}`;
-                    const call = peer.call(hostId, localStream);
-                    call.on('stream', remoteStream => addRemoteVideo(hostId, remoteStream));
-                    
-                    dataConn = peer.connect(hostId);
-                    setupDataConnection(dataConn);
-                }
-            });
-
-            // Host Listeners for Incoming Calls and Chat
-            peer.on('call', call => {
-                call.answer(localStream);
-                call.on('stream', remoteStream => addRemoteVideo(call.peer, remoteStream));
-            });
-
-            peer.on('connection', conn => {
-                dataConn = conn;
-                setupDataConnection(conn);
-            });
+            document.getElementById('localVideo').srcObject = localStream;
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
         }
 
-        function addRemoteVideo(peerId, stream) {
-            if (document.getElementById(`box-${peerId}`)) return;
+        // 1. المضيف بيبدأ الغرفة وبينشئ رابط حامل للمعرف المشفر
+        async function startHost() {
+            await initHardwareMedia();
+            document.getElementById('cardStep1').style.display = 'none';
+            document.getElementById('cardStep2').style.display = 'block';
+
+            dataChannel = pc.createDataChannel("chat");
+            setupDataChannel();
+
+            pc.onicecandidate = e => {
+                if (!e.candidate) {
+                    const encodedSDP = encodeURIComponent(btoa(JSON.stringify(pc.localDescription)));
+                    const directLink = `${location.origin}${location.pathname}#offer=${encodedSDP}`;
+                    document.getElementById('shareUrlInput').value = directLink;
+                }
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+        }
+
+        // 2. الضيف بيفتح الرابط المباشر
+        window.addEventListener('load', () => {
+            if (location.hash.includes('#offer=')) {
+                document.getElementById('cardStep1').style.display = 'none';
+                document.getElementById('cardGuestStep').style.display = 'block';
+            }
+        });
+
+        async function startGuest() {
+            await initHardwareMedia();
+            
+            pc.ondatachannel = e => {
+                dataChannel = e.channel;
+                setupDataChannel();
+            };
+
+            pc.onicecandidate = e => {
+                if (!e.candidate) {
+                    const encodedSDP = encodeURIComponent(btoa(JSON.stringify(pc.localDescription)));
+                    const replyLink = `${location.origin}${location.pathname}#answer=${encodedSDP}`;
+                    document.getElementById('guestReplyUrl').value = replyLink;
+                    document.getElementById('guestReplyBox').style.display = 'block';
+                }
+            };
+
+            const hashData = location.hash.replace('#offer=', '');
+            const offerSdp = JSON.parse(atob(decodeURIComponent(hashData)));
+            await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+        }
+
+        // 3. المضيف بيستلم رابط الرد وبيكتمل الاتصال
+        async function acceptGuestAnswer() {
+            let input = document.getElementById('hostAnswerInput').value.trim();
+            if(!input) return alert("ضع رابط الرد أو الكود أولاً!");
+
+            if (input.includes('#answer=')) {
+                input = input.split('#answer=')[1];
+            }
+
+            const answerSdp = JSON.parse(atob(decodeURIComponent(input)));
+            await pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+            document.getElementById('setupOverlay').style.display = 'none';
+        }
+
+        // استقبال أوتوماتيكي للـ Video Stream للطرفين
+        pc.ontrack = e => {
+            document.getElementById('setupOverlay').style.display = 'none';
+            if (document.getElementById('remoteVideo')) return;
 
             const grid = document.getElementById('videoGrid');
             const box = document.createElement('div');
             box.className = 'video-box';
-            box.id = `box-${peerId}`;
 
             const video = document.createElement('video');
-            video.srcObject = stream;
+            video.id = 'remoteVideo';
+            video.srcObject = e.streams[0];
             video.autoplay = true;
             video.playsinline = true;
 
             const overlay = document.createElement('div');
             overlay.className = 'video-overlay';
-            overlay.innerText = "طرف آخر";
+            overlay.innerText = 'الطرف الآخر (متصل مباشر ⚡)';
 
             box.appendChild(video);
             box.appendChild(overlay);
             grid.appendChild(box);
-        }
+        };
 
-        function setupDataConnection(conn) {
-            conn.on('open', () => console.log("Chat Connected!"));
-            conn.on('data', data => {
-                if (data.type === 'chat') {
-                    renderMessage(data.user, data.text, 'them');
-                }
-            });
+        // الشات والمحادثة النصية
+        function setupDataChannel() {
+            dataChannel.onmessage = e => {
+                const msg = document.createElement('div');
+                msg.className = 'msg';
+                msg.innerText = e.data;
+                document.getElementById('chatBox').appendChild(msg);
+            };
         }
 
         function sendChatMessage() {
             const input = document.getElementById('chatInput');
-            const text = input.value.trim();
-            if (!text || !dataConn) return;
+            if (!input.value || !dataChannel) return;
 
-            dataConn.send({ type: 'chat', user: userName, text: text });
-            renderMessage(userName, text, 'me');
+            dataChannel.send(input.value);
+            const msg = document.createElement('div');
+            msg.className = 'msg me';
+            msg.innerText = input.value;
+            document.getElementById('chatBox').appendChild(msg);
             input.value = '';
         }
 
-        function renderMessage(user, text, sender) {
-            const msg = document.createElement('div');
-            msg.className = `msg ${sender}`;
-            msg.innerText = `${user}: ${text}`;
-            document.getElementById('chatBox').appendChild(msg);
+        // أدوات مساعدة للنسخ والتفاعل
+        function copyShareLink() {
+            const el = document.getElementById('shareUrlInput');
+            el.select();
+            navigator.clipboard.writeText(el.value);
+            alert("تم نسخ الرابط المباشر للغرفة!");
         }
 
-        function handleChatKey(e) { if (e.key === 'Enter') sendChatMessage(); }
+        function copyGuestReplyLink() {
+            const el = document.getElementById('guestReplyUrl');
+            el.select();
+            navigator.clipboard.writeText(el.value);
+            alert("تم نسخ رابط الرد! أرسله للمضيف الآن.");
+        }
+
         function toggleSidebar() { document.getElementById('sidebarPanel').classList.toggle('active'); }
-
-        function toggleMic() {
-            isMicOn = !isMicOn;
-            localStream.getAudioTracks()[0].enabled = isMicOn;
-            document.getElementById('micBtn').classList.toggle('off', !isMicOn);
-        }
-
-        function toggleCam() {
-            isCamOn = !isCamOn;
-            localStream.getVideoTracks()[0].enabled = isCamOn;
-            document.getElementById('camBtn').classList.toggle('off', !isCamOn);
-        }
+        function toggleMic() { localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled; }
+        function toggleCam() { localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled; }
 
         async function toggleScreenShare() {
-            try {
-                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                const videoTrack = screenStream.getVideoTracks()[0];
-
-                document.getElementById('localVideo').srcObject = screenStream;
-
-                videoTrack.onended = () => {
-                    document.getElementById('localVideo').srcObject = localStream;
-                };
-            } catch (e) {
-                console.error("Screen Share Failed:", e);
-            }
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const videoTrack = screenStream.getVideoTracks()[0];
+            const sender = pc.getSenders().find(s => s.track.kind === 'video');
+            if (sender) sender.replaceTrack(videoTrack);
+            document.getElementById('localVideo').srcObject = screenStream;
         }
-
-        function logout() { location.reload(); }
     </script>
 </body>
 </html>

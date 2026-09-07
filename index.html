@@ -56,8 +56,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 15px;
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
         }
 
         .video-box {
@@ -66,27 +65,22 @@
             overflow: hidden;
             position: relative;
             border: 2px solid #334155;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
         }
 
         video { width: 100%; height: 100%; object-fit: cover; }
         .mirror { transform: scaleX(-1); }
 
         .video-overlay {
-            position: absolute;
-            bottom: 10px; right: 10px;
+            position: absolute; bottom: 10px; right: 10px;
             background: rgba(15, 23, 42, 0.8);
             padding: 4px 10px; border-radius: 6px; font-size: 0.8rem;
         }
 
         .sidebar {
-            width: 320px;
-            background: #0f172a;
+            width: 320px; background: #0f172a;
             border-right: 1px solid #334155;
-            display: none;
-            flex-direction: column;
+            display: none; flex-direction: column;
         }
         .sidebar.active { display: flex; }
 
@@ -98,13 +92,9 @@
         .chat-input-box input { flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px; }
 
         footer {
-            background: var(--card-bg);
-            height: 70px;
+            background: var(--card-bg); height: 70px;
             border-top: 1px solid #334155;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
         }
 
         .btn-ctrl {
@@ -135,6 +125,13 @@
             width: 100%; padding: 12px; background: var(--accent); color: #fff;
             border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px;
         }
+
+        .loader {
+            display: inline-block; width: 18px; height: 18px;
+            border: 3px solid rgba(255,255,255,.3); border-radius: 50%;
+            border-top-color: #fff; animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -177,7 +174,7 @@
         <div class="setup-card" id="cardStep1">
             <h2>محرك رابط الاتصال المباشر</h2>
             <p style="color:#94a3b8; font-size: 0.85rem; margin: 10px 0;">اضغط إنشاء لبدء الغرفة وتوليد رابط الدعوة المباشر</p>
-            <button class="btn-action" onclick="startHost()">🚀 إنشاء غرفة جديدة وتوليد الرابط</button>
+            <button class="btn-action" id="btnHost" onclick="startHost()">🚀 إنشاء غرفة جديدة وتوليد الرابط</button>
         </div>
 
         <div class="setup-card" id="cardStep2" style="display:none;">
@@ -195,7 +192,7 @@
         <div class="setup-card" id="cardGuestStep" style="display:none;">
             <h2>جاري الانضمام للغرفة...</h2>
             <p style="color:#94a3b8; font-size: 0.85rem; margin: 8px 0;">اضغط الزر لتجهيز رابط الرد وإرساله للمضيف:</p>
-            <button class="btn-action" style="background:#8b5cf6;" onclick="startGuest()">إنشاء رابط الرد 🔗</button>
+            <button class="btn-action" id="btnGuest" style="background:#8b5cf6;" onclick="startGuest()">إنشاء رابط الرد 🔗</button>
             
             <div id="guestReplyBox" style="display:none;">
                 <p style="color:#10b981; font-size: 0.8rem; margin-top:10px;">انسخ هذا الرابط وأرسله للمضيف لإتمام الاتصال:</p>
@@ -214,40 +211,58 @@
         };
 
         let pc = new RTCPeerConnection(rtcConfig);
-        let localStream, dataChannel;
+        let localStream = null, dataChannel = null;
 
-        // ضغط دقة ومعالجة الفيديو
+        // تهيئة الكاميرا مع التعامل مع أخطاء التصفح الخفي (Fallback)
         async function initHardwareMedia() {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { max: 640 }, height: { max: 480 }, frameRate: { max: 24 } },
-                audio: { echoCancellation: true, noiseSuppression: true }
-            });
-            document.getElementById('localVideo').srcObject = localStream;
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { max: 640 }, height: { max: 480 }, frameRate: { max: 24 } },
+                    audio: true
+                });
+                document.getElementById('localVideo').srcObject = localStream;
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            } catch (err) {
+                console.warn("الكاميرا/المايك غير متاحين أو محظورين في التصفح الخفي:", err);
+            }
         }
 
-        // 1. المضيف بيبدأ الغرفة وبينشئ رابط حامل للمعرف المشفر
+        // 1. المضيف بيبدأ الغرفة
         async function startHost() {
+            const btn = document.getElementById('btnHost');
+            btn.innerHTML = '<span class="loader"></span> جاري التوليد...';
+            btn.disabled = true;
+
             await initHardwareMedia();
-            document.getElementById('cardStep1').style.display = 'none';
-            document.getElementById('cardStep2').style.display = 'block';
 
             dataChannel = pc.createDataChannel("chat");
             setupDataChannel();
 
-            pc.onicecandidate = e => {
-                if (!e.candidate) {
-                    const encodedSDP = encodeURIComponent(btoa(JSON.stringify(pc.localDescription)));
-                    const directLink = `${location.origin}${location.pathname}#offer=${encodedSDP}`;
-                    document.getElementById('shareUrlInput').value = directLink;
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            // الانتظار حتى اكتمال جمع الـ ICE Candidates 100%
+            pc.onicegatheringstatechange = () => {
+                if (pc.iceGatheringState === 'complete') {
+                    generateHostLink();
                 }
             };
 
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
+            // حماية في حالة كان التجمع سريعاً
+            setTimeout(() => {
+                if (pc.iceGatheringState !== 'complete') generateHostLink();
+            }, 1500);
         }
 
-        // 2. الضيف بيفتح الرابط المباشر
+        function generateHostLink() {
+            const encodedSDP = encodeURIComponent(btoa(JSON.stringify(pc.localDescription)));
+            const directLink = `${location.origin}${location.pathname}#offer=${encodedSDP}`;
+            document.getElementById('shareUrlInput').value = directLink;
+            document.getElementById('cardStep1').style.display = 'none';
+            document.getElementById('cardStep2').style.display = 'block';
+        }
+
+        // 2. الضيف بيفتح الرابط
         window.addEventListener('load', () => {
             if (location.hash.includes('#offer=')) {
                 document.getElementById('cardStep1').style.display = 'none';
@@ -256,45 +271,68 @@
         });
 
         async function startGuest() {
+            const btn = document.getElementById('btnGuest');
+            btn.innerHTML = '<span class="loader"></span> جاري إنشاء الرد...';
+            btn.disabled = true;
+
             await initHardwareMedia();
-            
+
             pc.ondatachannel = e => {
                 dataChannel = e.channel;
                 setupDataChannel();
             };
 
-            pc.onicecandidate = e => {
-                if (!e.candidate) {
-                    const encodedSDP = encodeURIComponent(btoa(JSON.stringify(pc.localDescription)));
-                    const replyLink = `${location.origin}${location.pathname}#answer=${encodedSDP}`;
-                    document.getElementById('guestReplyUrl').value = replyLink;
-                    document.getElementById('guestReplyBox').style.display = 'block';
-                }
-            };
+            try {
+                const hashData = location.hash.split('#offer=')[1];
+                const offerSdp = JSON.parse(atob(decodeURIComponent(hashData)));
+                await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
 
-            const hashData = location.hash.replace('#offer=', '');
-            const offerSdp = JSON.parse(atob(decodeURIComponent(hashData)));
-            await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
 
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
+                pc.onicegatheringstatechange = () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        generateGuestLink();
+                    }
+                };
+
+                setTimeout(() => {
+                    generateGuestLink();
+                }, 1500);
+
+            } catch (e) {
+                alert("الرابط المباشر غير مكتمل أو منتهي، أعد المحاولة بنسخ الرابط كاملاً.");
+                btn.innerHTML = 'إنشاء رابط الرد 🔗';
+                btn.disabled = false;
+            }
         }
 
-        // 3. المضيف بيستلم رابط الرد وبيكتمل الاتصال
+        function generateGuestLink() {
+            const encodedSDP = encodeURIComponent(btoa(JSON.stringify(pc.localDescription)));
+            const replyLink = `${location.origin}${location.pathname}#answer=${encodedSDP}`;
+            document.getElementById('guestReplyUrl').value = replyLink;
+            document.getElementById('guestReplyBox').style.display = 'block';
+        }
+
+        // 3. المضيف بيقبل رابط الرد
         async function acceptGuestAnswer() {
             let input = document.getElementById('hostAnswerInput').value.trim();
-            if(!input) return alert("ضع رابط الرد أو الكود أولاً!");
+            if(!input) return alert("ضع رابط الرد هنا أولاً!");
 
             if (input.includes('#answer=')) {
                 input = input.split('#answer=')[1];
             }
 
-            const answerSdp = JSON.parse(atob(decodeURIComponent(input)));
-            await pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
-            document.getElementById('setupOverlay').style.display = 'none';
+            try {
+                const answerSdp = JSON.parse(atob(decodeURIComponent(input)));
+                await pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+                document.getElementById('setupOverlay').style.display = 'none';
+            } catch(e) {
+                alert("رابط الرد غير صحيح، تأكد من نسخه بالكامل!");
+            }
         }
 
-        // استقبال أوتوماتيكي للـ Video Stream للطرفين
+        // استقبال الصوت والفيديو أوتوماتيكياً
         pc.ontrack = e => {
             document.getElementById('setupOverlay').style.display = 'none';
             if (document.getElementById('remoteVideo')) return;
@@ -311,14 +349,14 @@
 
             const overlay = document.createElement('div');
             overlay.className = 'video-overlay';
-            overlay.innerText = 'الطرف الآخر (متصل مباشر ⚡)';
+            overlay.innerText = 'الطرف الآخر (متصل ⚡)';
 
             box.appendChild(video);
             box.appendChild(overlay);
             grid.appendChild(box);
         };
 
-        // الشات والمحادثة النصية
+        // المحادثة النصية
         function setupDataChannel() {
             dataChannel.onmessage = e => {
                 const msg = document.createElement('div');
@@ -340,12 +378,11 @@
             input.value = '';
         }
 
-        // أدوات مساعدة للنسخ والتفاعل
         function copyShareLink() {
             const el = document.getElementById('shareUrlInput');
             el.select();
             navigator.clipboard.writeText(el.value);
-            alert("تم نسخ الرابط المباشر للغرفة!");
+            alert("تم نسخ رابط الغرفة المباشر!");
         }
 
         function copyGuestReplyLink() {
@@ -356,15 +393,17 @@
         }
 
         function toggleSidebar() { document.getElementById('sidebarPanel').classList.toggle('active'); }
-        function toggleMic() { localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled; }
-        function toggleCam() { localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled; }
+        function toggleMic() { if(localStream) localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled; }
+        function toggleCam() { if(localStream) localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled; }
 
         async function toggleScreenShare() {
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const videoTrack = screenStream.getVideoTracks()[0];
-            const sender = pc.getSenders().find(s => s.track.kind === 'video');
-            if (sender) sender.replaceTrack(videoTrack);
-            document.getElementById('localVideo').srcObject = screenStream;
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const videoTrack = screenStream.getVideoTracks()[0];
+                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) sender.replaceTrack(videoTrack);
+                document.getElementById('localVideo').srcObject = screenStream;
+            } catch(e) {}
         }
     </script>
 </body>

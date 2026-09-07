@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetGits Meet Ultimate - Serverless</title>
-    <!-- PeerJS Library for Serverless WebRTC Multi-Peer Connections -->
+    <title>NetGits Meet Ultimate</title>
+    <!-- PeerJS CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -58,38 +58,15 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            overflow: hidden;
         }
 
-        /* Dynamic Grid Layout */
         .video-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 15px;
             width: 100%;
             height: 100%;
             max-width: 1400px;
-        }
-
-        /* Spotlight / Speaker Layout */
-        .video-grid.spotlight {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .video-grid.spotlight .video-box.focused {
-            flex: 1;
-            width: 100%;
-            max-height: 75vh;
-        }
-
-        .video-grid.spotlight .strip {
-            display: flex;
-            gap: 10px;
-            height: 120px;
-            overflow-x: auto;
-            width: 100%;
-            margin-top: 10px;
         }
 
         .video-box {
@@ -101,6 +78,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            min-height: 200px;
         }
 
         video { width: 100%; height: 100%; object-fit: cover; }
@@ -116,34 +94,6 @@
             font-size: 0.8rem;
         }
 
-        .reaction-badge {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            font-size: 2rem;
-            animation: pop 0.3s ease-out;
-        }
-
-        /* Interactive Whiteboard overlay */
-        #whiteboardContainer {
-            display: none;
-            width: 100%;
-            height: 100%;
-            background: #fff;
-            border-radius: 12px;
-            position: relative;
-        }
-        canvas { width: 100%; height: 100%; cursor: crosshair; }
-        .wb-tools {
-            position: absolute;
-            top: 10px; right: 10px;
-            background: #1e293b;
-            padding: 8px;
-            border-radius: 8px;
-            display: flex; gap: 8px;
-        }
-
-        /* Sidebar for Chat */
         .sidebar {
             width: 320px;
             background: var(--sidebar-bg);
@@ -168,7 +118,6 @@
         .chat-input-box { padding: 12px; border-top: 1px solid #334155; display: flex; gap: 8px; }
         .chat-input-box input { flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px; }
 
-        /* Footer Controls */
         footer {
             background: var(--card-bg);
             height: 70px;
@@ -176,7 +125,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
             padding: 0 15px;
         }
 
@@ -184,23 +133,19 @@
             background: #334155;
             color: #fff;
             border: none;
-            min-width: 42px;
-            height: 42px;
+            min-width: 45px;
+            height: 45px;
             border-radius: 10px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
-            transition: 0.2s;
+            font-size: 1.1rem;
         }
 
-        .btn-ctrl:hover { background: #475569; }
         .btn-ctrl.off { background: var(--danger); }
-        .btn-ctrl.active-mode { background: var(--accent); }
         .btn-end { background: var(--danger); font-weight: bold; padding: 0 15px; }
 
-        /* Setup Overlay */
         .setup-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -215,6 +160,7 @@
             border-radius: 16px;
             width: 100%; max-width: 450px;
             border: 1px solid #334155;
+            text-align: center;
         }
 
         input[type="text"] {
@@ -247,26 +193,14 @@
             <div class="video-grid" id="videoGrid">
                 <div class="video-box" id="box-local">
                     <video id="localVideo" class="mirror" autoplay playsinline muted></video>
-                    <div class="video-overlay">أنت</div>
-                    <div class="reaction-badge" id="react-local"></div>
+                    <div class="video-overlay" id="localTag">أنت</div>
                 </div>
-            </div>
-
-            <!-- Interactive Whiteboard -->
-            <div id="whiteboardContainer">
-                <div class="wb-tools">
-                    <input type="color" id="wbColor" value="#000000">
-                    <button class="btn-ctrl" onclick="clearBoard()">🗑️</button>
-                    <button class="btn-ctrl" onclick="toggleWhiteboard()">❌</button>
-                </div>
-                <canvas id="wbCanvas"></canvas>
             </div>
         </div>
 
-        <!-- Chat Sidebar -->
         <div class="sidebar" id="sidebarPanel">
             <div class="sidebar-header">
-                <span>المحادثة المباشرة</span>
+                <span>المحادثة النصية</span>
                 <button style="background:none; border:none; color:#fff; cursor:pointer;" onclick="toggleSidebar()">✕</button>
             </div>
             <div class="chat-messages" id="chatBox"></div>
@@ -277,108 +211,79 @@
         </div>
     </div>
 
-    <!-- Controls -->
     <footer id="footerControls" style="display:none;">
-        <button class="btn-ctrl" id="micBtn" onclick="toggleMic()" title="المايك">🎙️</button>
-        <button class="btn-ctrl" id="camBtn" onclick="toggleCam()" title="الكاميرا">📹</button>
-        <button class="btn-ctrl" id="screenBtn" onclick="toggleScreenShare()" title="مشاركة الشاشة">💻</button>
-        <button class="btn-ctrl" onclick="toggleWhiteboard()" title="السبورة">🎨</button>
-        <button class="btn-ctrl" onclick="sendReaction('✋')" title="رفع اليد">✋</button>
-        <button class="btn-ctrl" onclick="sendReaction('❤️')" title="تفاعل">❤️</button>
-        <button class="btn-ctrl" id="recBtn" onclick="toggleRecording()" title="تسجيل">🔴</button>
-        <button class="btn-ctrl" onclick="toggleSidebar()" title="الشات">💬</button>
-        <button class="btn-ctrl btn-end" onclick="logout()" title="إنهاء">مغادرة 🚪</button>
+        <button class="btn-ctrl" id="micBtn" onclick="toggleMic()">🎙️</button>
+        <button class="btn-ctrl" id="camBtn" onclick="toggleCam()">📹</button>
+        <button class="btn-ctrl" id="screenBtn" onclick="toggleScreenShare()">💻</button>
+        <button class="btn-ctrl" onclick="toggleSidebar()">💬</button>
+        <button class="btn-ctrl btn-end" onclick="logout()">مغادرة 🚪</button>
     </footer>
 
-    <!-- Setup Modal -->
     <div class="setup-overlay" id="setupOverlay">
         <div class="setup-card">
-            <h2>الانضمام للغرفة</h2>
-            <p style="color:var(--subtext); font-size:0.85rem; margin-top:5px;">ادخل اسم الغرفة للاتصال المباشر عبر GitHub Pages</p>
-            <input type="text" id="roomNameInput" placeholder="اسم الغرفة (مثال: dev-room)">
+            <h2>انضمام لغرفة GitHub Pages</h2>
             <input type="text" id="userNameInput" placeholder="اسمك (مثال: أحمد)">
-            <button class="btn-action" onclick="joinRoom()">دخول الاجتماع</button>
+            <input type="text" id="roomNameInput" placeholder="اسم الغرفة (مثال: my-room)">
+            
+            <button class="btn-action" onclick="initRoom(true)">إنشاء كـ (Host)</button>
+            <button class="btn-action" style="background:#10b981;" onclick="initRoom(false)">انضمام كـ (Guest)</button>
         </div>
     </div>
 
     <script>
         let peer = null;
         let localStream = null;
-        let peers = {};
-        let dataConns = [];
-        let currentRoom = "";
+        let dataConn = null;
+        let isMicOn = true, isCamOn = true;
         let userName = "";
-        let isMicOn = true, isCamOn = true, isRecording = false;
-        let mediaRecorder, recordedChunks = [];
 
-        // Canvas Setup
-        const canvas = document.getElementById('wbCanvas');
-        const ctx = canvas.getContext('2d');
-        let isDrawing = false;
-
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('room')) {
-                document.getElementById('roomNameInput').value = urlParams.get('room');
-            }
-        };
-
-        async function joinRoom() {
-            currentRoom = document.getElementById('roomNameInput').value.trim();
+        async function initRoom(isHost) {
+            const roomName = document.getElementById('roomNameInput').value.trim().toLowerCase();
             userName = document.getElementById('userNameInput').value.trim() || "مشارك";
 
-            if (!currentRoom) return alert("يرجى إدخال اسم الغرفة!");
+            if (!roomName) return alert("ادخل اسم الغرفة أولاً!");
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
             } catch (e) {
-                alert("يرجى إعطاء صلاحيات الكاميرا والمايكروفون!");
-                return;
+                return alert("يرجى إعطاء صلاحية الكاميرا والمايكروفون!");
             }
 
             document.getElementById('setupOverlay').style.display = 'none';
             document.getElementById('footerControls').style.display = 'flex';
-            document.getElementById('roomStatus').innerText = `الغرفة: ${currentRoom}`;
+            document.getElementById('localTag').innerText = `${userName} (أنت)`;
+            document.getElementById('roomStatus').innerText = `الغرفة: ${roomName}`;
 
-            // Initialize PeerJS for Serverless signaling over GitHub Pages
-            const peerId = `${currentRoom}-${Math.random().toString(36).substring(2, 7)}`;
+            // Host gets exact roomName as ID, Guest gets random ID
+            const peerId = isHost ? `netgits-${roomName}` : `netgits-${roomName}-user-${Math.floor(Math.random()*1000)}`;
+            
             peer = new Peer(peerId, {
                 config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
             });
 
-            peer.on('open', () => {
-                // Discover existing peers using a simple mesh signaling convention
-                broadcastPresence(peerId);
+            peer.on('open', (id) => {
+                console.log("My Peer ID:", id);
+                if (!isHost) {
+                    // Connect to Host Video + Chat
+                    const hostId = `netgits-${roomName}`;
+                    const call = peer.call(hostId, localStream);
+                    call.on('stream', remoteStream => addRemoteVideo(hostId, remoteStream));
+                    
+                    dataConn = peer.connect(hostId);
+                    setupDataConnection(dataConn);
+                }
             });
 
-            // Handle incoming media calls
+            // Host Listeners for Incoming Calls and Chat
             peer.on('call', call => {
                 call.answer(localStream);
-                call.on('stream', remoteStream => {
-                    addRemoteVideo(call.peer, remoteStream);
-                });
+                call.on('stream', remoteStream => addRemoteVideo(call.peer, remoteStream));
             });
 
-            // Handle incoming data connections (Chat & Sync)
             peer.on('connection', conn => {
+                dataConn = conn;
                 setupDataConnection(conn);
-            });
-        }
-
-        function broadcastPresence(myPeerId) {
-            // Signal connection attempt to room mesh
-            const conn = peer.connect(`${currentRoom}-host`);
-            if (conn) setupDataConnection(conn);
-        }
-
-        function setupDataConnection(conn) {
-            dataConns.push(conn);
-            conn.on('data', data => {
-                if (data.type === 'chat') renderMessage(data.user, data.text, 'them');
-                if (data.type === 'reaction') showReaction(data.peerId, data.symbol);
-                if (data.type === 'draw') drawOnCanvas(data.x, data.y, data.color, false);
-                if (data.type === 'clear_board') ctx.clearRect(0, 0, canvas.width, canvas.height);
             });
         }
 
@@ -397,26 +302,29 @@
 
             const overlay = document.createElement('div');
             overlay.className = 'video-overlay';
-            overlay.innerText = 'مشارك';
-
-            const react = document.createElement('div');
-            react.className = 'reaction-badge';
-            react.id = `react-${peerId}`;
+            overlay.innerText = "طرف آخر";
 
             box.appendChild(video);
             box.appendChild(overlay);
-            box.appendChild(react);
             grid.appendChild(box);
         }
 
-        // Chat System
+        function setupDataConnection(conn) {
+            conn.on('open', () => console.log("Chat Connected!"));
+            conn.on('data', data => {
+                if (data.type === 'chat') {
+                    renderMessage(data.user, data.text, 'them');
+                }
+            });
+        }
+
         function sendChatMessage() {
             const input = document.getElementById('chatInput');
             const text = input.value.trim();
-            if (!text) return;
+            if (!text || !dataConn) return;
 
+            dataConn.send({ type: 'chat', user: userName, text: text });
             renderMessage(userName, text, 'me');
-            dataConns.forEach(conn => conn.send({ type: 'chat', user: userName, text }));
             input.value = '';
         }
 
@@ -430,7 +338,6 @@
         function handleChatKey(e) { if (e.key === 'Enter') sendChatMessage(); }
         function toggleSidebar() { document.getElementById('sidebarPanel').classList.toggle('active'); }
 
-        // Controls Logic
         function toggleMic() {
             isMicOn = !isMicOn;
             localStream.getAudioTracks()[0].enabled = isMicOn;
@@ -448,90 +355,13 @@
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const videoTrack = screenStream.getVideoTracks()[0];
 
-                for (let p in peers) {
-                    const sender = peers[p].peerConnection.getSenders().find(s => s.track.kind === 'video');
-                    if (sender) sender.replaceTrack(videoTrack);
-                }
-
                 document.getElementById('localVideo').srcObject = screenStream;
 
                 videoTrack.onended = () => {
-                    const camTrack = localStream.getVideoTracks()[0];
-                    for (let p in peers) {
-                        const sender = peers[p].peerConnection.getSenders().find(s => s.track.kind === 'video');
-                        if (sender) sender.replaceTrack(camTrack);
-                    }
                     document.getElementById('localVideo').srcObject = localStream;
                 };
-            } catch (e) { console.error(e); }
-        }
-
-        // Whiteboard Functions
-        function toggleWhiteboard() {
-            const wb = document.getElementById('whiteboardContainer');
-            const isVis = wb.style.display === 'block';
-            wb.style.display = isVis ? 'none' : 'block';
-            document.getElementById('videoGrid').style.display = isVis ? 'grid' : 'none';
-            if (!isVis) { canvas.width = wb.clientWidth; canvas.height = wb.clientHeight; }
-        }
-
-        canvas.addEventListener('mousedown', () => isDrawing = true);
-        canvas.addEventListener('mouseup', () => isDrawing = false);
-        canvas.addEventListener('mousemove', e => {
-            if (!isDrawing) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const color = document.getElementById('wbColor').value;
-            drawOnCanvas(x, y, color, true);
-        });
-
-        function drawOnCanvas(x, y, color, broadcast) {
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(x, y, 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            if (broadcast) {
-                dataConns.forEach(conn => conn.send({ type: 'draw', x, y, color }));
-            }
-        }
-
-        function clearBoard() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            dataConns.forEach(conn => conn.send({ type: 'clear_board' }));
-        }
-
-        function sendReaction(symbol) {
-            showReaction('local', symbol);
-            dataConns.forEach(conn => conn.send({ type: 'reaction', peerId: peer.id, symbol }));
-        }
-
-        function showReaction(targetId, symbol) {
-            const el = document.getElementById(`react-${targetId}`);
-            if (el) { el.innerText = symbol; setTimeout(() => el.innerText = '', 3000); }
-        }
-
-        // Recording
-        function toggleRecording() {
-            if (!isRecording) {
-                recordedChunks = [];
-                mediaRecorder = new MediaRecorder(localStream);
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `meeting-${Date.now()}.webm`;
-                    a.click();
-                };
-                mediaRecorder.start();
-                isRecording = true;
-                document.getElementById('recBtn').classList.add('active-mode');
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
-                document.getElementById('recBtn').classList.remove('active-mode');
+            } catch (e) {
+                console.error("Screen Share Failed:", e);
             }
         }
 

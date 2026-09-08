@@ -1,19 +1,442 @@
-const $=s=>document.querySelector(s);let stream=null,screenStream=null,recorder=null,chunks=[],micOn=true,camOn=true,seconds=0,peer=null,dataChannel=null,isCaller=false;const rtcConfig={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'}]};const toast=t=>{const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2400)};function updateTimer(){seconds++;$('#meetingTimer').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}setInterval(updateTimer,1000);
-async function initMedia(){if(stream){$('#localVideo').srcObject=stream;$('#localVideo').play().catch(()=>{});return true}try{if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('secure-context');stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});const video=$('#localVideo');video.srcObject=stream;video.muted=true;video.hidden=false;$('#localPlaceholder').style.display='none';await video.play().catch(()=>{});toast('تم تشغيل الكاميرا والميكروفون');return true}catch(e){console.error(e);$('#localPlaceholder').style.display='flex';toast(e.name==='NotAllowedError'?'اسمح بالكاميرا والميكروفون من إعدادات المتصفح':'افتح الموقع عبر https:// على GitHub Pages');return false}}
-function waitForIce(){return new Promise(resolve=>{if(!peer||peer.iceGatheringState==='complete')return resolve();const done=()=>{if(peer.iceGatheringState==='complete'){peer.removeEventListener('icegatheringstatechange',done);resolve()}};peer.addEventListener('icegatheringstatechange',done);setTimeout(resolve,8000)})}
-function signalEncode(value){return btoa(unescape(encodeURIComponent(JSON.stringify(value))))}
-function signalDecode(value){try{return JSON.parse(decodeURIComponent(escape(atob(value.trim()))))}catch(e){toast('رمز الاتصال غير صحيح');return null}}
-function updateParticipants(connected){const count=connected?2:1;$('#participantCount').textContent=count;$('#participantLabel').textContent=`${count} مشارك${count===1?'':'ين'}`;$('#remoteCard').style.display=connected?'flex':'none';if(connected){$('#remotePeople').innerHTML='<div class="person" id="remotePerson"><span class="person-avatar green">م</span><div><b>المشارك المتصل</b><small>متصل الآن</small></div><span id="remotePersonMic">🎙</span></div>'}else $('#remotePeople').innerHTML=''}
-function setupPeer(){peer=new RTCPeerConnection(rtcConfig);updateParticipants(false);stream?.getTracks().forEach(track=>peer.addTrack(track,stream));peer.ontrack=e=>{const remote=e.streams?.[0]||new MediaStream([e.track]);$('#remoteVideo').srcObject=remote;$('#remoteVideo').play().catch(()=>{});$('#remotePlaceholder').style.display='none';$('#remoteStatus').textContent='متصل';updateParticipants(true)};peer.onconnectionstatechange=()=>{$('#p2pStatus').textContent=`الحالة: ${peer.connectionState}`;if(peer.connectionState==='connected'){updateParticipants(true);toast('تم الاتصال المباشر بنجاح')}if(['failed','disconnected','closed'].includes(peer.connectionState)){updateParticipants(false);$('#remoteStatus').textContent='في انتظار الاتصال';$('#remotePlaceholder').style.display='flex'}};peer.ondatachannel=e=>{dataChannel=e.channel;setupDataChannel()}}
-function setupDataChannel(){if(!dataChannel)return;dataChannel.onopen=()=>toast('قناة المحادثة متصلة');dataChannel.onmessage=e=>{try{const p=JSON.parse(e.data);if(p.type==='chat'){const item=document.createElement('div');item.className='chat-item';item.textContent=p.text;$('#chatList').append(item)}if(p.type==='reaction')toast(`تفاعل المشارك ${p.text}`)}catch(_){}}}
-async function createConnection(kind){if(!(await initMedia()))return;if(peer){peer.close();peer=null;dataChannel=null}setupPeer();if(kind==='offer'){isCaller=true;dataChannel=peer.createDataChannel('meet-chat');setupDataChannel();await peer.setLocalDescription(await peer.createOffer());await waitForIce();$('#signalOutput').value=signalEncode(peer.localDescription);$('#p2pStatus').textContent='تم إنشاء العرض. انسخه وأرسله للجهاز الثاني.'}else{$('#p2pStatus').textContent='الصق عرض الجهاز الأول في الرمز الوارد ثم اضغط معالجة الرمز.';toast('الجهاز جاهز لاستقبال العرض')}}
-function toggleTrack(kind){if(!stream)return;const tracks=kind==='audio'?stream.getAudioTracks():stream.getVideoTracks();const on=tracks.some(t=>t.enabled);tracks.forEach(t=>t.enabled=!on);const btn=kind==='audio'?$('#micBtn'):$('#cameraBtn');btn.classList.toggle('off',on);if(kind==='audio'){$('#localMicState').textContent=on?'🔇':'🎙';micOn=!on}else{camOn=!on;$('#localPlaceholder').style.display=on?'flex':'none'}toast(on?(kind==='audio'?'تم كتم الميكروفون':'تم إيقاف الكاميرا'):'تم التشغيل')}
-$('#micBtn').onclick=()=>toggleTrack('audio');$('#cameraBtn').onclick=()=>toggleTrack('video');
-$('#shareBtn').onclick=async()=>{try{if(!peer){toast('اتصل بالطرف الآخر أولاً');return}if(screenStream){await stopScreenShare();return}screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'motion'}});const track=screenStream.getVideoTracks()[0];const sender=peer.getSenders().find(s=>s.track?.kind==='video');if(sender)await sender.replaceTrack(track);$('#localVideo').srcObject=screenStream;$('#localVideo').play().catch(()=>{});$('#shareBtn').classList.add('active');track.onended=()=>stopScreenShare();toast('بدأت مشاركة الشاشة')}catch(e){toast(e.name==='NotAllowedError'?'تم إلغاء مشاركة الشاشة':'تعذر مشاركة الشاشة من هذا المتصفح')}};async function stopScreenShare(){if(!screenStream)return;const camera=stream?.getVideoTracks()[0],sender=peer?.getSenders().find(s=>s.track?.kind==='video');if(sender&&camera)await sender.replaceTrack(camera);screenStream.getTracks().forEach(t=>t.stop());screenStream=null;$('#localVideo').srcObject=stream;$('#localVideo').play().catch(()=>{});$('#shareBtn').classList.remove('active');toast('عادت الكاميرا')}
-$('#chatBtn').onclick=()=>{$('#sidePanel').classList.add('open');document.querySelector('[data-panel="chatPanel"]').click()};document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab,.panel-content').forEach(x=>x.classList.remove('active'));t.classList.add('active');$('#'+t.dataset.panel).classList.add('active');$('#sidePanel').classList.add('open')});
-$('#chatForm').onsubmit=e=>{e.preventDefault();const input=$('#chatInput'),text=input.value.trim();if(!text)return;const item=document.createElement('div');item.className='chat-item me';item.textContent=text;$('#chatList').append(item);if(dataChannel?.readyState==='open')dataChannel.send(JSON.stringify({type:'chat',text}));input.value='';$('#messageCount').textContent=+$('#messageCount').textContent+1;$('#chatList').scrollTop=1e6};
-$('#connectBtn').onclick=()=>$('#connectDialog').showModal();$('#connectClose').onclick=()=>$('#connectDialog').close();$('#createOfferBtn').onclick=()=>createConnection('offer');$('#createAnswerBtn').onclick=()=>createConnection('answer');$('#applySignalBtn').onclick=async()=>{const value=signalDecode($('#signalInput').value);if(!value)return;if(!(await initMedia()))return;if(!peer)setupPeer();try{if(value.type==='offer'){await peer.setRemoteDescription(value);await peer.setLocalDescription(await peer.createAnswer());await waitForIce();$('#signalOutput').value=signalEncode(peer.localDescription);$('#p2pStatus').textContent='تم إنشاء الرد. انسخه وأرسله للجهاز الأول.'}else if(value.type==='answer'){if(peer.signalingState!=='have-local-offer')throw new Error('answer-state');await peer.setRemoteDescription(value);$('#p2pStatus').textContent='تم قبول الرد. انتظر ظهور الاتصال.'}else throw new Error('signal-type');toast('تمت معالجة الرمز بنجاح')}catch(e){console.error(e);$('#p2pStatus').textContent='تعذر معالجة الرمز. تأكد أنك تستخدم العرض والرد الصحيحين.';toast('رمز غير صالح أو تم استخدامه سابقاً')}};$('#copySignalBtn').onclick=async()=>{const value=$('#signalOutput').value.trim();if(!value){toast('أنشئ رمز الاتصال أولاً');return}try{await navigator.clipboard.writeText(value);toast('تم نسخ رمز الاتصال')}catch(e){$('#signalOutput').select();toast('انسخ الرمز المحدد يدوياً')}};
-$('#reactionBtn').onclick=()=>$('#reactionMenu').classList.toggle('show');document.querySelectorAll('#reactionMenu button').forEach(b=>b.onclick=()=>{const text=b.textContent;toast(`أرسلت تفاعلاً ${text}`);if(dataChannel?.readyState==='open')dataChannel.send(JSON.stringify({type:'reaction',text}));$('#reactionMenu').classList.remove('show')});
-$('#boardBtn').onclick=()=>{$('#whiteboard').classList.toggle('show');$('#videoGrid').style.display=$('#whiteboard').classList.contains('show')?'none':'grid';if($('#whiteboard').classList.contains('show'))resizeBoard()};const canvas=$('#boardCanvas'),ctx=canvas.getContext('2d');let drawing=false;function resizeBoard(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight}window.addEventListener('resize',resizeBoard);canvas.onpointerdown=e=>{drawing=true;ctx.beginPath();ctx.moveTo(e.offsetX,e.offsetY)};canvas.onpointerup=()=>drawing=false;canvas.onpointermove=e=>{if(!drawing)return;ctx.strokeStyle=$('#boardColor').value;ctx.lineWidth=4;ctx.lineCap='round';ctx.lineTo(e.offsetX,e.offsetY);ctx.stroke()};$('#clearBoard').onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
-$('#recordBtn').onclick=()=>{if(!stream){toast('شغّل الكاميرا أولاً');return}if(!recorder){chunks=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>e.data.size&&chunks.push(e.data);recorder.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download=`netgits-meet-${Date.now()}.webm`;a.click();recorder=null};recorder.start();$('#recordBtn').classList.add('active');toast('بدأ التسجيل محلياً')}else{recorder.stop();$('#recordBtn').classList.remove('active');toast('تم حفظ التسجيل')}};
-$('#copyBtn').onclick=async()=>{$('#connectDialog').showModal();toast('استخدم اتصال P2P لإنشاء عرض وإرساله للطرف الآخر')};$('#inviteBtn').onclick=()=>$('#connectBtn').click();$('#addParticipant').onclick=()=>$('#connectBtn').click();$('#statsBtn').onclick=()=>$('#statsDialog').showModal();$('.dialog-close').onclick=()=>$('#statsDialog').close();$('#fullscreenBtn').onclick=()=>{const target=$('.stage');if(document.fullscreenElement)document.exitFullscreen?.();else target.requestFullscreen?.()};$('#layoutBtn').onclick=()=>{$('#videoGrid').classList.toggle('single');toast('تم تبديل التخطيط')};$('#leaveBtn').onclick=()=>{stream?.getTracks().forEach(t=>t.stop());screenStream?.getTracks().forEach(t=>t.stop());peer?.close();toast('تم إنهاء الاجتماع');setTimeout(()=>location.reload(),700)};window.addEventListener('beforeunload',()=>{stream?.getTracks().forEach(t=>t.stop());screenStream?.getTracks().forEach(t=>t.stop());peer?.close()});
+const $ = selector => document.querySelector(selector);
+
+let localStream = null;
+let screenStream = null;
+let peer = null;
+let dataChannel = null;
+let recorder = null;
+let recordedChunks = [];
+let seconds = 0;
+let cameraEnabled = true;
+let microphoneEnabled = true;
+let screenSharing = false;
+let signalBusy = false;
+
+const rtcConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ],
+  bundlePolicy: 'max-bundle'
+};
+
+const toast = message => {
+  const element = $('#toast');
+  if (!element) return;
+  element.textContent = message;
+  element.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => element.classList.remove('show'), 2800);
+};
+
+setInterval(() => {
+  seconds++;
+  const timer = $('#meetingTimer');
+  if (timer) timer.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}, 1000);
+
+function setStatus(message) {
+  const status = $('#p2pStatus');
+  if (status) status.textContent = message;
+}
+
+function setLocalVideo(source) {
+  const video = $('#localVideo');
+  if (!video) return;
+  video.srcObject = source;
+  video.muted = true;
+  video.autoplay = true;
+  video.playsInline = true;
+  video.hidden = false;
+  video.play().catch(() => toast('اضغط داخل الصفحة للسماح بتشغيل الفيديو'));
+}
+
+function cameraErrorMessage(error) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+    return 'اسمح بالكاميرا والميكروفون من رمز القفل بجانب عنوان GitHub Pages ثم أعد المحاولة.';
+  }
+  if (error?.name === 'NotFoundError') return 'لم يتم العثور على كاميرا أو ميكروفون متصل.';
+  if (error?.name === 'NotReadableError') return 'الكاميرا مستخدمة في تطبيق آخر. أغلقه ثم أعد المحاولة.';
+  if (error?.name === 'SecurityError' || !window.isSecureContext) return 'افتح رابط GitHub Pages عبر HTTPS وليس من ملف HTML محلي.';
+  return `تعذر تشغيل الوسائط: ${error?.name || 'خطأ غير معروف'}`;
+}
+
+async function initMedia() {
+  if (localStream) {
+    setLocalVideo(localStream);
+    return true;
+  }
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    toast('الكاميرا تحتاج HTTPS. استخدم رابط GitHub Pages الذي يبدأ بـ https://');
+    return false;
+  }
+
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+  } catch (error) {
+    console.error('getUserMedia failed:', error);
+    toast(cameraErrorMessage(error));
+    return false;
+  }
+
+  const videoTrack = localStream.getVideoTracks()[0];
+  const audioTrack = localStream.getAudioTracks()[0];
+  cameraEnabled = !!videoTrack?.enabled;
+  microphoneEnabled = !!audioTrack?.enabled;
+  setLocalVideo(localStream);
+  if ($('#localPlaceholder')) $('#localPlaceholder').style.display = videoTrack ? 'none' : 'flex';
+  if ($('#localMicState')) $('#localMicState').textContent = audioTrack ? '🎙' : '🔇';
+  toast('تم تشغيل الكاميرا والميكروفون');
+  return true;
+}
+
+function encodeSignal(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let binary = '';
+  bytes.forEach(byte => binary += String.fromCharCode(byte));
+  return btoa(binary);
+}
+
+function decodeSignal(value) {
+  try {
+    const normalized = value.trim().replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(normalized);
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    toast('الرمز غير صحيح. انسخه كاملاً دون تعديل أو مسافات.');
+    return null;
+  }
+}
+
+function waitForIceGathering(connection) {
+  if (connection.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise(resolve => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      connection.removeEventListener('icegatheringstatechange', check);
+      resolve();
+    };
+    const check = () => {
+      if (connection.iceGatheringState === 'complete') finish();
+    };
+    connection.addEventListener('icegatheringstatechange', check);
+    setTimeout(finish, 10000);
+  });
+}
+
+function updateParticipants(connected) {
+  const count = connected ? 2 : 1;
+  if ($('#participantCount')) $('#participantCount').textContent = count;
+  if ($('#participantLabel')) $('#participantLabel').textContent = `${count} ${count === 1 ? 'مشارك' : 'مشاركين'}`;
+  if ($('#remoteCard')) $('#remoteCard').style.display = connected ? 'flex' : 'none';
+  if ($('#remotePeople')) {
+    $('#remotePeople').innerHTML = connected
+      ? '<div class="person" id="remotePerson"><span class="person-avatar green">م</span><div><b>المشارك المتصل</b><small>متصل الآن</small></div><span id="remotePersonMic">🎙</span></div>'
+      : '';
+  }
+}
+
+function setupDataChannel(channel) {
+  dataChannel = channel;
+  dataChannel.onopen = () => toast('المحادثة المباشرة متصلة');
+  dataChannel.onclose = () => toast('انقطعت قناة المحادثة');
+  dataChannel.onerror = () => toast('تعذر إرسال رسالة عبر الاتصال المباشر');
+  dataChannel.onmessage = event => {
+    try {
+      const packet = JSON.parse(event.data);
+      if (packet.type === 'chat') {
+        const item = document.createElement('div');
+        item.className = 'chat-item';
+        item.textContent = packet.text;
+        $('#chatList')?.append(item);
+        if ($('#messageCount')) $('#messageCount').textContent = Number($('#messageCount').textContent) + 1;
+        $('#chatList').scrollTop = 1e6;
+      }
+      if (packet.type === 'reaction') toast(`تفاعل المشارك ${packet.text}`);
+    } catch (_) {
+      console.warn('Invalid data channel packet');
+    }
+  };
+}
+
+function setupPeer() {
+  if (peer) peer.close();
+  peer = new RTCPeerConnection(rtcConfig);
+  updateParticipants(false);
+  if (localStream) localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+
+  peer.ontrack = event => {
+    let remote = $('#remoteVideo').srcObject;
+    if (!(remote instanceof MediaStream)) remote = new MediaStream();
+    if (!remote.getTracks().some(track => track.id === event.track.id)) remote.addTrack(event.track);
+    $('#remoteVideo').srcObject = remote;
+    $('#remoteVideo').play().catch(() => toast('اضغط داخل الصفحة لتشغيل فيديو المشارك'));
+    $('#remotePlaceholder').style.display = 'none';
+    $('#remoteStatus').textContent = 'متصل';
+    updateParticipants(true);
+  };
+
+  peer.ondatachannel = event => setupDataChannel(event.channel);
+  peer.onconnectionstatechange = () => {
+    const state = peer.connectionState;
+    setStatus(`الحالة الحالية: ${state}`);
+    if (state === 'connected') {
+      updateParticipants(true);
+      toast('تم الاتصال الحقيقي بنجاح');
+    }
+    if (['failed', 'disconnected', 'closed'].includes(state)) {
+      updateParticipants(false);
+      $('#remoteStatus').textContent = 'في انتظار الاتصال';
+      $('#remotePlaceholder').style.display = 'flex';
+    }
+  };
+}
+
+async function createOffer() {
+  if (signalBusy || !(await initMedia())) return;
+  signalBusy = true;
+  try {
+    setupPeer();
+    setupDataChannel(peer.createDataChannel('meet-chat', { ordered: true }));
+    await peer.setLocalDescription(await peer.createOffer());
+    setStatus('جاري تجهيز العرض... لا تغلق النافذة.');
+    await waitForIceGathering(peer);
+    $('#signalOutput').value = encodeSignal(peer.localDescription);
+    setStatus('تم إنشاء العرض. انسخه وأرسله للمشارك الثاني.');
+    toast('العرض جاهز للنسخ');
+  } catch (error) {
+    console.error(error);
+    toast('تعذر إنشاء عرض الاتصال');
+  } finally {
+    signalBusy = false;
+  }
+}
+
+async function prepareAnswer() {
+  if (!(await initMedia())) return;
+  if (!peer) setupPeer();
+  setStatus('الصق عرض المضيف في الرمز الوارد ثم اضغط معالجة الرمز.');
+  toast('الجهاز جاهز لاستقبال عرض المضيف');
+}
+
+function toggleTrack(kind) {
+  const tracks = kind === 'audio' ? localStream?.getAudioTracks() : localStream?.getVideoTracks();
+  if (!tracks?.length) return toast(kind === 'audio' ? 'لا يوجد ميكروفون متاح' : 'لا توجد كاميرا متاحة');
+  const enabled = tracks.some(track => track.enabled);
+  tracks.forEach(track => track.enabled = !enabled);
+  if (kind === 'audio') {
+    microphoneEnabled = !enabled;
+    $('#localMicState').textContent = microphoneEnabled ? '🎙' : '🔇';
+    $('#localPersonMic').textContent = microphoneEnabled ? '🎙' : '🔇';
+    $('#micBtn').classList.toggle('off', !microphoneEnabled);
+  } else {
+    cameraEnabled = !enabled;
+    $('#localPlaceholder').style.display = cameraEnabled ? 'none' : 'flex';
+    $('#cameraBtn').classList.toggle('off', !cameraEnabled);
+  }
+  toast(enabled ? 'تم الإيقاف' : 'تم التشغيل');
+}
+
+async function stopScreenShare() {
+  if (!screenStream) return;
+  const cameraTrack = localStream?.getVideoTracks()[0];
+  const sender = peer?.getSenders().find(item => item.track?.kind === 'video' || item.transceiver?.receiver?.track?.kind === 'video');
+  if (sender && cameraTrack) await sender.replaceTrack(cameraTrack);
+  screenStream.getTracks().forEach(track => track.stop());
+  screenStream = null;
+  screenSharing = false;
+  setLocalVideo(localStream);
+  $('#shareBtn').classList.remove('active');
+  toast('عادت الكاميرا');
+}
+
+async function toggleScreenShare() {
+  if (!peer || peer.connectionState !== 'connected') return toast('اتصل بالمشارك أولاً ثم ابدأ المشاركة');
+  if (!navigator.mediaDevices?.getDisplayMedia) return toast('مشاركة الشاشة غير مدعومة في هذا المتصفح');
+  if (screenSharing) return stopScreenShare();
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'motion' }, audio: false });
+    const screenTrack = screenStream.getVideoTracks()[0];
+    const sender = peer.getSenders().find(item => item.track?.kind === 'video');
+    if (!sender) throw new Error('video-sender-not-found');
+    await sender.replaceTrack(screenTrack);
+    screenSharing = true;
+    setLocalVideo(screenStream);
+    $('#shareBtn').classList.add('active');
+    screenTrack.onended = () => stopScreenShare();
+    toast('بدأت مشاركة الشاشة مع المشارك');
+  } catch (error) {
+    console.error(error);
+    screenStream = null;
+    toast(error.name === 'NotAllowedError' ? 'تم إلغاء مشاركة الشاشة' : 'تعذر بدء مشاركة الشاشة');
+  }
+}
+
+$('#micBtn').onclick = () => toggleTrack('audio');
+$('#cameraBtn').onclick = () => toggleTrack('video');
+$('#shareBtn').onclick = toggleScreenShare;
+
+$('#chatForm').onsubmit = event => {
+  event.preventDefault();
+  const input = $('#chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const item = document.createElement('div');
+  item.className = 'chat-item me';
+  item.textContent = text;
+  $('#chatList').append(item);
+  $('#chatList').scrollTop = 1e6;
+  if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'chat', text }));
+  input.value = '';
+  $('#messageCount').textContent = Number($('#messageCount').textContent) + 1;
+};
+
+$('#createOfferBtn').onclick = createOffer;
+$('#createAnswerBtn').onclick = prepareAnswer;
+$('#applySignalBtn').onclick = async () => {
+  const value = decodeSignal($('#signalInput').value);
+  if (!value || !value.type || !value.sdp) return;
+  if (!(await initMedia())) return;
+  try {
+    if (value.type === 'offer') {
+      if (!peer) setupPeer();
+      await peer.setRemoteDescription(value);
+      await peer.setLocalDescription(await peer.createAnswer());
+      setStatus('جاري تجهيز الرد...');
+      await waitForIceGathering(peer);
+      $('#signalOutput').value = encodeSignal(peer.localDescription);
+      setStatus('تم إنشاء الرد. انسخه وأرسله إلى المضيف.');
+      toast('الرد جاهز للنسخ');
+    } else if (value.type === 'answer') {
+      if (!peer || peer.signalingState !== 'have-local-offer') {
+        throw new Error('يجب إنشاء عرض على هذا الجهاز أولاً');
+      }
+      await peer.setRemoteDescription(value);
+      setStatus('تم قبول الرد. انتظر الاتصال الحقيقي...');
+      toast('تم قبول رد المشارك');
+    } else {
+      throw new Error('signal-type');
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus('تعذر معالجة الرمز. تأكد من استخدام عرض ورد من نفس الجلسة.');
+    toast(error.message || 'رمز غير صالح أو مستخدم سابقاً');
+  }
+};
+
+$('#copySignalBtn').onclick = async () => {
+  const value = $('#signalOutput').value.trim();
+  if (!value) return toast('أنشئ العرض أو الرد أولاً');
+  try {
+    await navigator.clipboard.writeText(value);
+    toast('تم نسخ الرمز');
+  } catch (_) {
+    $('#signalOutput').select();
+    toast('تم تحديد الرمز؛ انسخه يدوياً');
+  }
+};
+
+$('#connectBtn').onclick = () => $('#connectDialog').showModal();
+$('#connectClose').onclick = () => $('#connectDialog').close();
+$('#copyBtn').onclick = () => $('#connectDialog').showModal();
+$('#inviteBtn').onclick = () => $('#connectDialog').showModal();
+$('#addParticipant').onclick = () => $('#connectDialog').showModal();
+
+$('#chatBtn').onclick = () => {
+  $('#sidePanel').classList.add('open');
+  document.querySelector('[data-panel="chatPanel"]').click();
+};
+document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => {
+  document.querySelectorAll('.tab, .panel-content').forEach(item => item.classList.remove('active'));
+  tab.classList.add('active');
+  $(`#${tab.dataset.panel}`).classList.add('active');
+  $('#sidePanel').classList.add('open');
+});
+
+document.querySelectorAll('#reactionMenu button').forEach(button => button.onclick = () => {
+  const text = button.textContent;
+  toast(`أرسلت تفاعلاً ${text}`);
+  if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'reaction', text }));
+  $('#reactionMenu').classList.remove('show');
+});
+$('#reactionBtn').onclick = () => $('#reactionMenu').classList.toggle('show');
+
+const canvas = $('#boardCanvas');
+const context = canvas.getContext('2d');
+let drawing = false;
+function resizeBoard() { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+window.addEventListener('resize', resizeBoard);
+canvas.onpointerdown = event => { drawing = true; canvas.setPointerCapture(event.pointerId); context.beginPath(); context.moveTo(event.offsetX, event.offsetY); };
+canvas.onpointerup = () => drawing = false;
+canvas.onpointercancel = () => drawing = false;
+canvas.onpointermove = event => {
+  if (!drawing) return;
+  context.strokeStyle = $('#boardColor').value;
+  context.lineWidth = 4;
+  context.lineCap = 'round';
+  context.lineTo(event.offsetX, event.offsetY);
+  context.stroke();
+};
+$('#clearBoard').onclick = () => context.clearRect(0, 0, canvas.width, canvas.height);
+$('#boardBtn').onclick = () => {
+  const visible = $('#whiteboard').classList.toggle('show');
+  $('#videoGrid').style.display = visible ? 'none' : 'grid';
+  if (visible) requestAnimationFrame(resizeBoard);
+};
+
+$('#recordBtn').onclick = () => {
+  if (!localStream) return toast('شغّل الكاميرا أولاً');
+  if (recorder) {
+    recorder.stop();
+    $('#recordBtn').classList.remove('active');
+    toast('تم إيقاف التسجيل وحفظه محلياً');
+    return;
+  }
+  try {
+    recordedChunks = [];
+    recorder = new MediaRecorder(localStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    recorder.ondataavailable = event => event.data.size && recordedChunks.push(event.data);
+    recorder.onstop = () => {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
+      link.download = `netgits-meet-${Date.now()}.webm`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      recorder = null;
+    };
+    recorder.start(1000);
+    $('#recordBtn').classList.add('active');
+    toast('بدأ التسجيل محلياً');
+  } catch (error) {
+    recorder = null;
+    toast('التسجيل غير مدعوم بهذا المتصفح');
+  }
+};
+
+$('#statsBtn').onclick = () => $('#statsDialog').showModal();
+$('#fullscreenBtn').onclick = () => {
+  const target = $('.stage');
+  if (document.fullscreenElement) document.exitFullscreen();
+  else target.requestFullscreen?.();
+};
+$('#layoutBtn').onclick = () => { $('#videoGrid').classList.toggle('single'); toast('تم تبديل تخطيط الفيديو'); };
+$('#leaveBtn').onclick = () => { cleanup(); toast('تم إنهاء الاجتماع'); setTimeout(() => location.reload(), 700); };
+
+document.querySelectorAll('dialog .dialog-close').forEach(button => button.onclick = () => button.closest('dialog').close());
+function cleanup() {
+  if (screenStream) screenStream.getTracks().forEach(track => track.stop());
+  if (localStream) localStream.getTracks().forEach(track => track.stop());
+  peer?.close();
+  screenStream = null;
+  localStream = null;
+  peer = null;
+}
+window.addEventListener('beforeunload', cleanup);
+
+updateParticipants(false);
